@@ -143,7 +143,7 @@ export HUGGINGFACE_HUB_CACHE=/Users/your-username/.cache/huggingface/hub
 langgraph dev --allow-blocking
 ```
 
-The studio will be available at http://localhost:2123
+The studio will be available at http://localhost:2024 (or custom port if specified)
 
 ### 4. Testing with Jupyter
 
@@ -252,7 +252,9 @@ graph LR
 
 ## 🛠 Development Information
 
-### Recent Updates (2025-10-09)
+### Recent Updates (2025-10-10)
+- **LangGraph Studio Initialization Fix**: Resolved "Failed to initialize LangGraph Studio" error by ensuring execution from root directory
+- **Project Structure Cleanup**: Successfully moved from `studio/` subdirectory structure to root-level organization
 - **Data Format Fix**: Resolved candidate format compatibility between Stage A → Step 6
 - **Architecture Separation**: Changed from monolithic to modular node structure
 - **HuggingFace Cache Resolution**: Completely resolved /Volumes/X31 path issues
@@ -284,9 +286,28 @@ jupyter notebook test_phase2_integration_async.ipynb
 ```
 
 ### LangGraph Studio Testing
-1. Run `langgraph dev --allow-blocking`
-2. Navigate to http://localhost:2123
-3. Test complete flow with sample conversations
+1. **Start the server**:
+   ```bash
+   # From project root directory
+   source .env
+   export HF_HOME=/Users/your-username/.cache/huggingface
+   langgraph dev --allow-blocking
+   ```
+
+2. **Access the Studio**:
+   - Open your browser and go to the URL shown in terminal output
+   - Usually: `https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024`
+   - API docs available at: `http://127.0.0.1:2024/docs`
+
+3. **Test complete flow**:
+   - Try sample conversations like: "I'm feeling stressed about work"
+   - Monitor the console for DEBUG messages showing the pipeline execution
+   - Verify art recommendations are generated successfully
+
+4. **Important Notes**:
+   - ⚠️ **Always run from the root project directory** (`arti_llm/`), not from any subdirectories
+   - ⚠️ If you encounter initialization issues, kill existing processes and restart fresh
+   - ⚠️ Make sure your `.env` file contains valid API keys for OpenAI/Fireworks
 
 ## 🐛 Troubleshooting
 
@@ -305,6 +326,30 @@ jupyter notebook test_phase2_integration_async.ipynb
 
 4. **Async/Await Errors**
    - Verify `loop.run_in_executor` pattern usage
+
+5. **LangGraph Studio Initialization Issues**
+   - **Problem**: "Failed to initialize LangGraph Studio" or "TypeError: Failed to fetch"
+   - **Cause**: Running from wrong directory or old cached processes
+   - **Solution**: 
+     ```bash
+     # Kill any existing processes
+     pkill -f "langgraph dev"
+     
+     # Ensure you're in the root project directory
+     cd /path/to/arti_llm
+     
+     # Start fresh from root directory (not studio subdirectory)
+     source .env
+     export HF_HOME=/Users/your-username/.cache/huggingface
+     langgraph dev --allow-blocking
+     ```
+
+6. **Port Conflicts**
+   - **Problem**: "Address already in use" error
+   - **Solution**: Use a different port
+     ```bash
+     langgraph dev --port 8080 --allow-blocking
+     ```
 
 ### Log Monitoring
 - Check DEBUG messages in LangGraph Studio console
