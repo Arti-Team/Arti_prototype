@@ -1,0 +1,206 @@
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyTorch
+*.pth
+*.pt
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# Conda
+conda-meta/
+
+# HuggingFace Cache
+.cache/
+.huggingface/
+
+# Model files and large data
+models/
+*.bin
+*.safetensors
+
+# FAISS indices
+indices/
+*.index
+*.faiss
+
+# Data files (too large for git)
+data/markdown/
+data/images/
+*.jsonl
+metadata.jsonl
+
+# Storage and cache
+storage/
+.cache/
+
+# Vector stores
+langchain_vectorstore/
+*.pkl
+*.pickle
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Test outputs
+test_results/
+test_outputs/
+*.test
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# LangChain cache
+.langchain/
+
+# OpenAI cache
+.openai/
+
+# LangGraph Studio
+.langgraph_api/
+
+# ===========================================
+# Project-specific exclusions
+# ===========================================
+
+# Image files from research papers and documentation
+art_curation_engine/data/markdown/*/img-*.jpeg
+art_curation_engine/data/markdown/*/img-*.jpg
+art_curation_engine/data/markdown/*/img-*.png
+art_curation_engine/data/aic_sample/images/
+
+# Personal and experimental notebooks (keep core test notebook)
+chat_bot_sample.ipynb
+graph.ipynb
+deployment.ipynb
+test_rag_interactive.ipynb
+
+# Korean documentation (keep English versions only)
+CLAUDE.md
+LangGraph_Deployment_Guide.md
+
+# Development and planning documents
+LangGraph Development Guide.md
+LangGraph_Implementation_Plan.md
+summary/
+
+# Research papers and markdown content
+art_curation_engine/data/markdown/
+art_curation_engine/docs/plan.md
+
+# Large model files
+art_curation_engine/models/all-MiniLM-L6-v2/
+
+# Vector store and embeddings
+art_curation_engine/data/embeddings/
+art_curation_engine/data/vectorstore/
+
+# Personal test files and experiments
+*_personal.py
+*_test.py
+*_experiment.py
+*_draft.*
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+
+# Large data files
+*.csv
+*.tsv
+*.xlsx
+*.pdf
+
+# ===========================================
+# Additional project cleanup
+# ===========================================
+
+# Nested git repositories (art_curation_engine has its own .git)
+art_curation_engine/.git/
+
+# Cache and storage directories with data
+art_curation_engine/.cache/
+art_curation_engine/storage/
+art_curation_engine/indices/
+
+# Vector stores and embeddings (large binary files)
+art_curation_engine/langchain_vectorstore/
+*.faiss
+*.pkl
+
+# Test result files and caches
+art_curation_engine/tests/
+*_test_*.json
+*_cache.json
+end_to_end_test_*.json
+
+# Generated indices and search results
+rag_test_results.json
+clip_faiss/
+
+# Development summary files
+summary/module-*.md
