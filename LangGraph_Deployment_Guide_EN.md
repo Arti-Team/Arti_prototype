@@ -15,14 +15,39 @@ Emotion-based art recommendation system - a conversational AI docent built with 
 ```
 arti_llm/
 ├── emotional_art_graph.py          # Main LangGraph workflow
-├── rag_session.py                  # RAG knowledge system
+├── rag_session.py                  # RAG knowledge system  
 ├── langgraph.json                  # LangGraph configuration
-├── art_curation_engine/            # Core recommendation engine
-│   ├── core/                       # Pipeline components
-│   ├── data/                       # Artwork metadata
-│   ├── indices/                    # FAISS search indices
-│   └── storage/                    # Cache and results
-└── README.md                       # Detailed documentation
+├── requirements.txt                # Python dependencies
+├── .env.example                    # Environment template
+├── .gitignore                      # Git ignore rules
+├── README.md                       # Detailed documentation
+├── CLAUDE_EN.md                    # Development guide (English)
+├── LangGraph_Deployment_Guide_EN.md # This deployment guide
+├── test_phase2_integration_async.ipynb # Integration tests
+└── art_curation_engine/            # Core recommendation engine
+    ├── .env.example                # Engine environment template
+    ├── README.md                   # Engine documentation
+    ├── build_clip_index.py         # CLIP index builder
+    ├── core/                       # Pipeline components
+    │   ├── __init__.py
+    │   ├── dynamic_stage_a.py       # Dynamic candidate collection
+    │   ├── langchain_rag_system.py  # RAG system implementation
+    │   ├── llm_prompts.py          # LLM prompt templates
+    │   ├── rag_session_langchain.py # RAG session management
+    │   ├── stage_a_candidate_collection.py # Stage A pipeline
+    │   └── step6_llm_reranking.py   # Step 6 reranking
+    ├── data/                       # Artwork metadata and rules
+    │   ├── aic_sample/             # Sample artwork data
+    │   ├── corpus/                 # Text corpus
+    │   ├── rag_pdf_description.md  # RAG data description
+    │   └── rules/                  # Curation rules (safety, seed)
+    ├── docs/                       # Engine documentation
+    │   └── SETUP.md                # Setup instructions
+    ├── indices/                    # FAISS search indices
+    ├── langchain_vectorstore/      # LangChain vector storage
+    ├── models/                     # ML models directory
+    ├── storage/                    # Cache and results
+    └── tests/                      # Test suites
 ```
 
 ## Quick Start
