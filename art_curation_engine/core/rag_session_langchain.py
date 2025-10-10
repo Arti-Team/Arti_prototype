@@ -136,15 +136,15 @@ Return only JSON:"""
             response = self.llm.complete(query_generation_prompt)
             response_text = response.text.strip()
             
-            # JSON 추출
+            # Extract JSON
             if "```json" in response_text:
                 start = response_text.find("```json") + 7
                 end = response_text.find("```", start)
                 response_text = response_text[start:end].strip()
             elif response_text.startswith("["):
-                pass  # 이미 JSON 형태
+                pass  # Already in JSON format
             else:
-                # JSON 배열 부분만 추출
+                # Extract only JSON array part
                 start = response_text.find("[")
                 end = response_text.rfind("]") + 1
                 response_text = response_text[start:end]
@@ -199,19 +199,19 @@ Return only JSON:"""
         evidence_list = []
         
         if use_parallel:
-            # 병렬 처리
+            # Parallel processing
             with ThreadPoolExecutor(max_workers=min(3, len(queries))) as executor:
-                # 쿼리 실행
+                # Execute queries
                 future_to_query = {
                     executor.submit(self._search_single_query, query, top_k): query 
                     for query in queries
                 }
                 
-                # 결과 수집
-                for future in as_completed(future_to_query, timeout=30):  # 30초 타임아웃
+                # Collect results
+                for future in as_completed(future_to_query, timeout=30):  # 30 second timeout
                     query = future_to_query[future]
                     try:
-                        query_evidence = future.result(timeout=10)  # 개별 쿼리 10초 타임아웃
+                        query_evidence = future.result(timeout=10)  # Individual query 10 second timeout
                         evidence_list.extend(query_evidence)
                         print(f"  ✅ Query completed: {query[:50]}... ({len(query_evidence)} results)")
                         
@@ -219,7 +219,7 @@ Return only JSON:"""
                         print(f"  ⚠️ Query failed: {query[:50]}... - {e}")
                         continue
         else:
-            # 기존 순차 처리
+            # Existing sequential processing
             for i, query in enumerate(queries):
                 print(f"  Query {i+1}/{len(queries)}: {query[:50]}...")
                 

@@ -40,7 +40,7 @@ llm = ChatOpenAI(
 # =============================================================================
 
 class EmotionalArtState(MessagesState):
-    """확장된 대화 추적을 위한 감정 아트 상태"""
+    """Emotional art state for extended conversation tracking"""
     
     # Core conversation data
     current_phase: str = "greeting"
@@ -71,7 +71,7 @@ class EmotionalArtState(MessagesState):
 # =============================================================================
 
 class UserProfile(BaseModel):
-    """사용자 프로필 스키마"""
+    """User profile schema"""
     name: Optional[str] = Field(description="User Name", default=None)
     location: Optional[str] = Field(description="User Location", default=None)
     job: Optional[str] = Field(description="Job", default=None)
@@ -81,7 +81,7 @@ class UserProfile(BaseModel):
     interests: List[str] = Field(description="Interests or Hobbies", default_factory=list)
 
 class ArtPreferences(BaseModel):
-    """아트 선호도 스키마"""
+    """Art preferences schema"""
     liked_styles: List[str] = Field(description="Liked Art Styles", default_factory=list)
     avoided_topics: List[str] = Field(description="Topics to Avoid", default_factory=list)
     helpful_motifs: List[str] = Field(description="Helpful Motives or Themes", default_factory=list)
@@ -90,7 +90,7 @@ class ArtPreferences(BaseModel):
     feedback_history: List[str] = Field(description="Feedback about Artwork", default_factory=list)
 
 class InteractionPatterns(BaseModel):
-    """상호작용 패턴 스키마"""
+    """Interaction patterns schema"""
     preferred_communication_style: Optional[str] = Field(description="Preferred Communication Style", default=None)
     effective_approaches: List[str] = Field(description="Effective Approaches", default_factory=list)
     conversation_preferences: List[str] = Field(description="Conversation Preferences", default_factory=list)
@@ -106,28 +106,28 @@ class UpdateMemory(TypedDict):
 # =============================================================================
 
 class ConversationPhaseManager:
-    """확장된 대화 플로우를 메인 노드 내에서 처리"""
+    """Handle extended conversation flow within the main node"""
 
     def __init__(self, llm):
         self.llm = llm
 
     async def detect_phase(self, state: EmotionalArtState) -> str:
-        """확장된 대화 추적을 기반으로 현재 대화 단계 결정 - 자연스러운 큐레이션 전환 고려"""
-        # 첫 번째 메시지인지 확인 (HumanMessage만 하나 있는 경우)
+        """Determine current conversation phase based on extended conversation tracking - consider natural curation transition"""
+        # Check if this is the first message (only one HumanMessage exists)
         from langchain_core.messages import HumanMessage
         human_messages = [msg for msg in state.get("messages", []) if isinstance(msg, HumanMessage)]
         
         if len(human_messages) <= 1:
             return "greeting"
-        elif state.get("conversation_depth", 0) < 3:  # 최소 3턴은 대화 진행
+        elif state.get("conversation_depth", 0) < 3:  # Continue conversation for at least 3 turns
             return "deep_sensing"
         elif not state.get("final_situation"):
-            # 3턴 이상이면 큐레이션 readiness 체크
+            # After 3+ turns, check curation readiness
             readiness = await self.assess_curation_readiness(state)
             if readiness["ready"] and readiness["confidence"] >= 0.7:
                 return "final_analysis"
             else:
-                return "deep_sensing"  # 아직 더 대화 필요
+                return "deep_sensing"  # Still need more conversation
         elif (
             state.get("final_situation")
             and state.get("final_emotions")
@@ -137,13 +137,13 @@ class ConversationPhaseManager:
         elif state.get("consent_for_reco") == True:
             return "providing_curation"
         elif state.get("consent_for_reco") == False:
-            # 사용자가 큐레이션을 거절한 경우 대화 계속
+            # Continue conversation when user declines curation
             return "continuing_after_rejection"
         else:
             return "continuing"
 
     async def extract_emotion_hints(self, message_content: str) -> List[str]:
-        """LLM을 사용해서 메시지에서 감정 힌트 추출"""
+        """Extract emotion hints from message using LLM"""
         emotion_prompt = f"""
         Analyze this message and extract emotional indicators:
         
@@ -168,7 +168,7 @@ class ConversationPhaseManager:
             return []
 
     async def extract_situation_hints(self, message_content: str) -> List[str]:
-        """LLM을 사용해서 메시지에서 상황 힌트 추출"""
+        """Extract situation hints from message using LLM"""
         situation_prompt = f"""
         Analyze this message and extract situational context:
         
@@ -194,7 +194,7 @@ class ConversationPhaseManager:
             return []
 
     async def generate_contextual_question(self, state: EmotionalArtState, user_context: dict = None) -> str:
-        """대화 맥락을 기반으로 공감적인 응답과 질문 생성"""
+        """Generate empathetic response and question based on conversation context"""
         recent_messages = state.get("messages", [])[-4:]
         conversation_text = "\n".join(
             [f"{msg.type}: {msg.content}" for msg in recent_messages]
@@ -204,7 +204,7 @@ class ConversationPhaseManager:
         situation_hints = state.get("situation_hints", [])
         depth = state.get("conversation_depth", 0)
         
-        # 사용자 이름 추출
+        # Extract user name
         user_name = ""
         if user_context:
             user_name = extract_user_name_from_memory(user_context)
@@ -260,7 +260,7 @@ class ConversationPhaseManager:
             return "Hey, it sounds like you've got a lot on your mind. What's been the biggest thing bothering you lately?"
 
     async def assess_curation_readiness(self, state: EmotionalArtState) -> dict:
-        """대화 맥락을 기반으로 큐레이션 제안의 자연스러운 시점 판단"""
+        """Determine natural timing for curation proposal based on conversation context"""
         recent_messages = state.get("messages", [])[-6:]
         conversation_text = "\n".join(
             [f"{msg.type}: {msg.content}" for msg in recent_messages]
@@ -336,7 +336,7 @@ class ConversationPhaseManager:
             }
 
     async def analyze_user_consent(self, user_message: str) -> dict:
-        """사용자의 큐레이션 동의/거절 의도 분석"""
+        """Analyze user's intent for curation consent/rejection"""
         consent_prompt = f"""
         Analyze this user response to determine if they want art recommendations or prefer to continue talking.
         
@@ -388,7 +388,7 @@ class ConversationPhaseManager:
             }
 
     async def perform_final_analysis(self, state: EmotionalArtState) -> dict:
-        """수집된 모든 힌트를 분석하며 최종 감정/상황 판정"""
+        """Analyze all collected hints and make final emotion/situation determination"""
         all_emotion_hints = state.get("emotion_hints", [])
         all_situation_hints = state.get("situation_hints", [])
         recent_messages = state.get("messages", [])[-8:]
@@ -453,27 +453,27 @@ class ConversationPhaseManager:
 # =============================================================================
 
 def extract_user_name_from_memory(user_context: dict) -> str:
-    """메모리에서 사용자 이름 추출"""
+    """Extract user name from memory"""
     if user_context.get("profile") and isinstance(user_context["profile"], dict):
         return user_context["profile"].get("name", "")
     return ""
 
 async def load_user_memories(config: RunnableConfig, store: BaseStore) -> dict:
-    """사용자 메모리 로드"""
-    # LangGraph Studio에서는 user_id가 자동으로 설정되지 않을 수 있음
+    """Load user memories"""
+    # In LangGraph Studio, user_id may not be automatically set
     user_id = config.get("configurable", {}).get("user_id") or config.get("configurable", {}).get("thread_id", "default_user")
 
-    # 프로필 메모리 로드
+    # Load profile memory
     profile_namespace = ("profile", user_id)
     profile_memories = await store.asearch(profile_namespace)
     profile = profile_memories[0].value if profile_memories else None
 
-    # 아트 선호도 메모리 로드
+    # Load art preferences memory
     art_namespace = ("art_preferences", user_id)
     art_memories = await store.asearch(art_namespace)
     art_preferences = [mem.value for mem in art_memories]
 
-    # 상호작용 패턴 메모리 로드
+    # Load interaction patterns memory
     interaction_namespace = ("interaction_patterns", user_id)
     interaction_memories = await store.asearch(interaction_namespace)
     interaction_patterns = [mem.value for mem in interaction_memories]
@@ -485,15 +485,15 @@ async def load_user_memories(config: RunnableConfig, store: BaseStore) -> dict:
     }
 
 def generate_greeting_response(user_context: dict) -> str:
-    """인사 응답 생성"""
+    """Generate greeting response"""
     return "Hey there! I'm here to chat and maybe help you discover some amazing art along the way. How's your day going?"
 
 def generate_continuing_response(state: EmotionalArtState, user_context: dict) -> str:
-    """지속적인 대화 응답 생성"""
+    """Generate continuing conversation response"""
     return "How are you feeling about the artwork? Would you like to explore more, or is there something else on your mind?"
 
 async def analyze_for_memory_updates(state: EmotionalArtState, response: str, user_context: dict, llm) -> dict:
-    """LLM을 사용한 메모리 업데이트 필요 여부 분석"""
+    """Analyze memory update necessity using LLM"""
     recent_messages = state["messages"][-4:]
     conversation_text = "\n".join([
         f"{msg.type}: {msg.content}" for msg in recent_messages
@@ -503,7 +503,7 @@ async def analyze_for_memory_updates(state: EmotionalArtState, response: str, us
     current_art_prefs = user_context.get("art_preferences", "No art preferences stored")
     current_interactions = user_context.get("interaction_patterns", "No interaction patterns stored")
     
-    # emotion_hints와 situation_hints 정보 추가
+    # Add emotion_hints and situation_hints information
     emotion_hints = state.get("emotion_hints", [])
     situation_hints = state.get("situation_hints", [])
 
@@ -804,7 +804,7 @@ class Spy:
                     r.outputs["generations"][0][0]["message"]["kwargs"]["tool_calls"]
                 )
 
-# Extractors 생성
+# Create extractors
 profile_extractor = create_extractor(
     llm,
     tools=[UserProfile],
@@ -830,13 +830,13 @@ interaction_extractor = create_extractor(
 # =============================================================================
 
 async def conversation_node(state: EmotionalArtState, config: RunnableConfig, store: BaseStore):
-    """대화 전용 노드 - 감정 추출, 메모리 업데이트, 기본 응답 처리"""
+    """Conversation-only node - emotion extraction, memory updates, basic response handling"""
     
     print("=== NEW CONVERSATION_NODE STARTED ===")
     print(f"State: {list(state.keys())}")
     print("=== NEW CONVERSATION_NODE STARTED ===")
     
-    # Store 검증 및 fallback 처리 추가
+    # Add store validation and fallback handling
     if store is None:
         print("WARNING: Store is None, using InMemoryStore fallback")
         from langgraph.store.memory import InMemoryStore
@@ -850,7 +850,7 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
         
         current_phase = await phase_manager.detect_phase(state)
         
-        # 마지막 사용자 메시지 가져오기
+        # Get the last user message
         last_user_message = None
         for msg in reversed(state["messages"]):
             if isinstance(msg, HumanMessage):
@@ -859,10 +859,10 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
         
         print(f"DEBUG: Phase={current_phase}, User message={last_user_message}")
         
-        # State 업데이트를 위한 딕셔너리 준비
+        # Prepare dictionary for state updates
         state_updates = {}
         
-        # 모든 사용자 메시지에서 힌트 추출 (항상 실행하여 안정성 확보)
+        # Extract hints from all user messages (always run for stability)
         if last_user_message:
             try:
                 emotion_hints = await phase_manager.extract_emotion_hints(last_user_message)
@@ -870,15 +870,15 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
                 
                 print(f"DEBUG: Raw extracted hints - emotions: {emotion_hints}, situations: {situation_hints}")
                 
-                # 기존 힌트와 병합하고 중복 제거 및 최대 5개 유지
+                # Merge with existing hints, remove duplicates, and keep max 5
                 current_emotion_hints = state.get("emotion_hints", [])
                 current_situation_hints = state.get("situation_hints", [])
                 
-                # 새로운 힌트 추가하고 중복 제거 (순서 유지)
+                # Add new hints and remove duplicates (maintain order)
                 all_emotion_hints = current_emotion_hints + emotion_hints
                 all_situation_hints = current_situation_hints + situation_hints
                 
-                # 중복 제거하면서 순서 유지, 최대 5개로 제한
+                # Remove duplicates while maintaining order, limit to max 5
                 state_updates["emotion_hints"] = list(dict.fromkeys(all_emotion_hints))[-5:]
                 state_updates["situation_hints"] = list(dict.fromkeys(all_situation_hints))[-5:]
                 
@@ -886,11 +886,11 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
                 
             except Exception as e:
                 print(f"DEBUG: Error extracting hints: {e}")
-                # 오류 시 기존 힌트 유지
+                # Maintain existing hints on error
                 state_updates["emotion_hints"] = state.get("emotion_hints", [])
                 state_updates["situation_hints"] = state.get("situation_hints", [])
         else:
-            # 메시지가 없으면 기존 힌트 유지
+            # If no message, maintain existing hints
             state_updates["emotion_hints"] = state.get("emotion_hints", [])
             state_updates["situation_hints"] = state.get("situation_hints", [])
         
@@ -898,12 +898,12 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
             response_content = generate_greeting_response(user_context)
         
         elif current_phase == "deep_sensing":
-            # conversation_depth는 deep_sensing에서만 증가
+            # conversation_depth is incremented only in deep_sensing
             state_updates["conversation_depth"] = state.get("conversation_depth", 0) + 1
             response_content = await phase_manager.generate_contextual_question(state, user_context)
         
         elif current_phase == "final_analysis":
-            # 먼저 readiness를 다시 체크해서 자연스러운 전환 문구 가져오기
+            # First re-check readiness to get natural transition phrase
             readiness = await phase_manager.assess_curation_readiness(state)
             analysis_result = await phase_manager.perform_final_analysis(state)
             
@@ -913,7 +913,7 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
             
             if analysis_result["confidence"] >= 0.7:
                 state_updates["current_phase"] = "offering"
-                # 자연스러운 전환 문구 사용
+                # Use natural transition phrase
                 natural_transition = readiness.get("natural_transition", "You know what, I'm thinking some artwork might really help with what you're going through...")
                 response_content = f"{natural_transition} Want me to find some pieces that might really speak to you right now?"
             else:
@@ -921,7 +921,7 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
                 response_content = await phase_manager.generate_contextual_question(state, user_context)
         
         elif current_phase == "offering":
-            # 사용자의 동의/거절 분석
+            # Analyze user consent/rejection
             if last_user_message:
                 consent_analysis = await phase_manager.analyze_user_consent(last_user_message)
                 
@@ -934,22 +934,22 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
                     state_updates["consent_for_reco"] = False
                     response_content = "Totally get it! I'm here to chat whenever you need. What else is going on with you?"
                 else:
-                    # 불확실한 경우 명확히 물어보기
+                    # Ask clearly when uncertain
                     response_content = "I'm happy either way - want me to show you some cool art pieces, or would you rather keep talking about what's on your mind?"
             else:
                 response_content = "What do you think - want me to find some cool artwork that might vibe with how you're feeling, or would you rather keep chatting?"
         
         elif current_phase == "providing_curation":
-            # Curation phase는 별도 노드에서 처리하도록 phase 업데이트만
+            # Curation phase handled by separate node, only update phase
             state_updates["current_phase"] = "ready_for_curation"
             response_content = "Let me find some perfect pieces for you..."
             
         elif current_phase == "continuing_after_rejection":
-            # 큐레이션을 거절한 후 대화 계속 - 힌트 추출은 위에서 이미 처리됨
+            # Continue conversation after rejecting curation - hint extraction already handled above
             state_updates["conversation_depth"] = state.get("conversation_depth", 0) + 1
             
             if last_user_message:
-                # 새로운 주제에 대해 empathetic하게 응답
+                # Respond empathetically to new topic
                 response_content = await phase_manager.generate_contextual_question(state, user_context)
             else:
                 response_content = "What's been on your mind lately?"
@@ -960,11 +960,11 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
         else:
             response_content = "Hey, I'm here for you. What's going on?"
         
-        # 메모리 업데이트 결정 - 힌트가 있으면 항상 프로필 업데이트
+        # Decide memory update - always update profile if hints exist
         current_emotion_hints = state_updates.get("emotion_hints", [])
         current_situation_hints = state_updates.get("situation_hints", [])
         
-        # 힌트가 새로 추가되었거나 기존 힌트가 있으면 프로필 업데이트
+        # Update profile if hints are newly added or existing hints exist
         if current_emotion_hints or current_situation_hints:
             memory_analysis = {
                 "update_needed": True,
@@ -980,8 +980,8 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
         print(f"DEBUG: Current emotion hints in state: {state.get('emotion_hints', [])}")
         print(f"DEBUG: Current situation hints in state: {state.get('situation_hints', [])}")
         
-        # state_updates가 이미 emotion_hints와 situation_hints를 포함하고 있으므로 중복 처리 제거
-        # 위에서 이미 phase별로 추출되었으므로 여기서는 기존 값 유지만
+        # state_updates already includes emotion_hints and situation_hints, remove duplicate processing
+        # Already extracted by phase above, so only maintain existing values here
         if "emotion_hints" not in state_updates:
             state_updates["emotion_hints"] = state.get("emotion_hints", [])
         if "situation_hints" not in state_updates:
@@ -991,9 +991,9 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
         print(f"DEBUG: Final situation hints: {state_updates['situation_hints']}")
         print(f"DEBUG: All state updates: {list(state_updates.keys())}")
 
-        # 메모리 업데이트가 필요한 경우 백그라운드에서 처리
+        # Process memory update in background if needed
         if memory_analysis["update_needed"]:
-            # 유효한 update_type인지 검증 (안정성 강화)
+            # Validate if update_type is valid (enhance stability)
             valid_update_types = ["profile", "art_preferences", "interaction_patterns"]
             update_type = memory_analysis.get("update_type", "")
             
@@ -1001,7 +1001,7 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
                 print(f"DEBUG: Invalid update_type '{update_type}', skipping memory update")
                 print(f"DEBUG: Valid types are: {valid_update_types}")
             else:
-                # 백그라운드에서 메모리 업데이트 수행
+                # Perform memory update in background
                 try:
                     print(f"DEBUG: About to update {update_type} memory")
                     print(f"DEBUG: Recent messages for extraction: {[msg.content for msg in state['messages'][-6:]]}")
@@ -1065,7 +1065,7 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
                     import traceback
                     traceback.print_exc()
         
-        # 항상 정상적인 AI 응답 반환
+        # Always return normal AI response
         return {"messages": [AIMessage(content=response_content)], **state_updates}
     
     except Exception as e:
@@ -1075,7 +1075,7 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
         return {"messages": [AIMessage(content="I'm here to help. How are you feeling today?")]}
 
 async def update_user_profile(state: EmotionalArtState, config: RunnableConfig, store: BaseStore):
-    """사용자 프로필 업데이트"""
+    """Update user profile"""
     
     user_id = config.get("configurable", {}).get("user_id") or config.get("configurable", {}).get("thread_id", "default_user")
     namespace = ("profile", user_id)
@@ -1084,14 +1084,14 @@ async def update_user_profile(state: EmotionalArtState, config: RunnableConfig, 
     existing_memories = ([(existing_item.key, "UserProfile", existing_item.value) 
                          for existing_item in existing_items] if existing_items else None)
     
-    # 최근 메시지만 사용하고, 실제 사용자 메시지만 필터링
-    recent_messages = state["messages"][-3:]  # 더 적은 메시지 사용
+    # Use only recent messages and filter for actual user messages only
+    recent_messages = state["messages"][-3:]  # Use fewer messages
     user_messages_only = [msg for msg in recent_messages if isinstance(msg, HumanMessage)]
     
     print(f"DEBUG: Messages being sent to Trustcall: {[msg.content for msg in user_messages_only]}")
     print(f"DEBUG: Existing memories: {existing_memories}")
     
-    # emotion_hints와 situation_hints를 Trustcall에 제공
+    # Provide emotion_hints and situation_hints to Trustcall
     current_emotion_hints = state.get("emotion_hints", [])
     current_situation_hints = state.get("situation_hints", [])
     
@@ -1129,16 +1129,16 @@ async def update_user_profile(state: EmotionalArtState, config: RunnableConfig, 
     System Time: {datetime.now().isoformat()}
     """
     
-    # 시스템 instruction과 사용자 메시지만 사용
+    # Use only system instruction and user messages
     messages_for_extraction = [SystemMessage(content=trustcall_instruction)] + user_messages_only
     
     spy = Spy()
     profile_extractor_with_spy = profile_extractor.with_listeners(on_end=spy)
     
-    # 기존 메모리를 전달하지 않아서 완전히 새로운 추출만 수행
+    # Don't pass existing memory, perform only completely new extraction
     result = profile_extractor_with_spy.invoke({
         "messages": messages_for_extraction,
-        "existing": None  # 기존 메모리 무시하고 새로 추출
+        "existing": None  # Ignore existing memory and extract new
     })
     
     for r, rmeta in zip(result["responses"], result["response_metadata"]):
@@ -1146,11 +1146,11 @@ async def update_user_profile(state: EmotionalArtState, config: RunnableConfig, 
                          rmeta.get("json_doc_id", str(uuid.uuid4())),
                          r.model_dump(mode="json"))
 
-    # 백그라운드에서 호출되므로 응답 불필요
+    # Called from background, no response needed
     return
 
 async def update_art_preferences(state: EmotionalArtState, config: RunnableConfig, store: BaseStore):
-    """아트 선호도 업데이트"""
+    """Update art preferences"""
     
     user_id = config.get("configurable", {}).get("user_id") or config.get("configurable", {}).get("thread_id", "default_user")
     namespace = ("art_preferences", user_id)
@@ -1182,11 +1182,11 @@ async def update_art_preferences(state: EmotionalArtState, config: RunnableConfi
                          rmeta.get("json_doc_id", str(uuid.uuid4())),
                          r.model_dump(mode="json"))
 
-    # 백그라운드에서 호출되므로 응답 불필요
+    # Called from background, no response needed
     return
 
 async def update_interaction_patterns(state: EmotionalArtState, config: RunnableConfig, store: BaseStore):
-    """상호작용 패턴 업데이트"""
+    """Update interaction patterns"""
 
     user_id = config.get("configurable", {}).get("user_id") or config.get("configurable", {}).get("thread_id", "default_user")
     namespace = ("interaction_patterns", user_id)
@@ -1219,7 +1219,7 @@ async def update_interaction_patterns(state: EmotionalArtState, config: Runnable
                          rmeta.get("json_doc_id", str(uuid.uuid4())),
                          r.model_dump(mode="json"))
 
-    # 백그라운드에서 호출되므로 응답 불필요
+    # Called from background, no response needed
     return
 
 # =============================================================================
@@ -1434,9 +1434,9 @@ async def handle_curation_request(state: EmotionalArtState, config: RunnableConf
         print(f"DEBUG: Restored working directory to {original_cwd}")
 
 async def art_curation_node(state: EmotionalArtState, config: RunnableConfig, store: BaseStore):
-    """아트 큐레이션 전용 노드 - Art Curation Engine 실행"""
+    """Art curation dedicated node - Art Curation Engine execution"""
     
-    # Store 검증 및 fallback 처리 추가
+    # Add store validation and fallback handling
     if store is None:
         print("WARNING: Store is None in art_curation_node, using InMemoryStore fallback")
         from langgraph.store.memory import InMemoryStore
@@ -1582,11 +1582,11 @@ async def art_curation_node(state: EmotionalArtState, config: RunnableConfig, st
 # =============================================================================
 
 def should_curate_art(state: EmotionalArtState) -> Literal["art_curation_node", END]:
-    """아트 큐레이션이 필요한지 결정하는 조건부 라우팅"""
+    """Conditional routing to determine if art curation is needed"""
     
     current_phase = state.get("current_phase", "")
     
-    # ready_for_curation 단계이거나 사용자가 동의한 경우에만 아트 큐레이션 실행
+    # Execute art curation only in ready_for_curation phase or when user consents
     if (current_phase == "ready_for_curation" or 
         state.get("consent_for_reco", False)):
         print(f"DEBUG: Routing to art curation - phase: {current_phase}, consent: {state.get('consent_for_reco', False)}")
@@ -1597,7 +1597,7 @@ def should_curate_art(state: EmotionalArtState) -> Literal["art_curation_node", 
 
 
 def route_message(state: EmotionalArtState, config: RunnableConfig, store: BaseStore) -> Literal[END, "update_user_profile", "update_art_preferences", "update_interaction_patterns"]:
-    """메시지 라우팅 - tool call 기반으로 메모리 업데이트 노드 결정"""
+    """Message routing - determine memory update node based on tool call"""
     
     message = state['messages'][-1]
     
@@ -1621,14 +1621,14 @@ def route_message(state: EmotionalArtState, config: RunnableConfig, store: BaseS
 # GRAPH CONSTRUCTION
 # =============================================================================
 
-# StateGraph 생성
+# Create StateGraph
 builder = StateGraph(EmotionalArtState)
 
-# 노드 추가
+# Add nodes
 builder.add_node("conversation_node", conversation_node)
 builder.add_node("art_curation_node", art_curation_node)
 
-# Edge 정의
+# Define edges
 builder.add_edge(START, "conversation_node")
 builder.add_conditional_edges(
     "conversation_node",
