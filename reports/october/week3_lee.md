@@ -1,9 +1,9 @@
 ## 🧠 Developer Weekly Report Template
 
-**Name:** LEE
-**Role / Department:** AI engineer
-**Week**:week3
-**Date:** 18/Oct 2025
+- **Name:** LEE
+- **Role / Department:** AI engineer
+- **Week**:week3
+- **Date:** 18/Oct 2025
 
 ---
 
