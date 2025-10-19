@@ -2,7 +2,7 @@
 
 **Name:** LEE
 **Role / Department:** AI engineer
-**Week #**:week3
+**Week**:week3
 **Date:** 18/Oct 2025
 
 ---
