@@ -38,8 +38,6 @@ Provide a short summary (3–5 sentences) of what you worked on this week. Focus
 | Challenge                         | Root Cause                           | Solution / Next Step                                  |
 | --------------------------------- | ------------------------------------ | ----------------------------------------------------- |
 | NaN |  |  |
-|          |  |            |
-|               |         |                       |
 
 ---
 
