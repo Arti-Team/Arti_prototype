@@ -537,7 +537,7 @@ class StageACollector:
         Args:
             situation: User situation description
             emotions: List of user emotions  
-            mode: "budget" (120), "balanced" (150), or "quality-max" (180)
+            mode: "budget" (120), "balanced" (80), or "quality-max" (180)
             
         Returns:
             Complete Stage A results with candidates, scores, and debug info
@@ -550,7 +550,7 @@ class StageACollector:
         # Set parameters based on mode
         mode_params = {
             "budget": {"target": 120, "a1_cap": 180, "a2_topk": 125, "a2_cap": 120},
-            "balanced": {"target": 150, "a1_cap": 200, "a2_topk": 140, "a2_cap": 150},
+            "balanced": {"target": 80, "a1_cap": 160, "a2_topk": 110, "a2_cap": 80},  # Reduced for better performance
             "quality-max": {"target": 180, "a1_cap": 220, "a2_topk": 155, "a2_cap": 180}
         }
         

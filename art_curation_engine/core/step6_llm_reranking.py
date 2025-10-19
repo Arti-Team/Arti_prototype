@@ -4,6 +4,8 @@ import os
 import json
 import hashlib
 import logging
+import time
+import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -77,7 +79,7 @@ class Step6LLMReranker:
     """
     Step 6 LLM Reranking System
     
-    Reranks 150 Stage A candidates to 30 final recommendations using:
+    Reranks 80 Stage A candidates to 30 final recommendations using:
     - Multi-dimensional LLM scoring (6 dimensions)
     - Batch processing for efficiency  
     - Caching for performance
@@ -86,9 +88,11 @@ class Step6LLMReranker:
     
     def __init__(self, 
                  model_name: str = "accounts/fireworks/models/llama-v3p1-70b-instruct",
-                 batch_size: int = 15,
-                 max_workers: int = 3,
-                 cache_ttl_hours: int = 24):
+                 batch_size: int = 3,
+                 max_workers: int = 1,
+                 cache_ttl_hours: int = 24,
+                 api_delay_seconds: float = 2.0,
+                 max_retries: int = 3):
         """
         Initialize Step 6 LLM Reranker
         
@@ -97,12 +101,17 @@ class Step6LLMReranker:
             batch_size: Number of artworks per batch
             max_workers: Max parallel batches
             cache_ttl_hours: Cache time-to-live in hours
+            api_delay_seconds: Delay between API calls to avoid rate limits
+            max_retries: Maximum retry attempts for failed API calls
         """
         
         self.model_name = model_name
         self.batch_size = batch_size
         self.max_workers = max_workers
         self.cache_ttl = timedelta(hours=cache_ttl_hours)
+        self.api_delay = api_delay_seconds
+        self.max_retries = max_retries
+        self.last_api_call_time = 0.0
         
         # Initialize LLM
         self.llm = self._initialize_llm()
@@ -116,6 +125,7 @@ class Step6LLMReranker:
         self._load_justification_cache()
         
         logger.info(f"Step 6 LLM Reranker initialized with model: {model_name}")
+        logger.info(f"Rate limiting: {api_delay_seconds}s delay, batch_size={batch_size}, max_workers={max_workers}")
     
     def _initialize_llm(self) -> ChatFireworks:
         """Initialize LLM with error handling"""
@@ -137,6 +147,43 @@ class Step6LLMReranker:
         except Exception as e:
             logger.error(f"Failed to initialize LLM: {e}")
             raise
+    
+    def _call_llm_with_rate_limit(self, prompt: str) -> str:
+        """Call LLM with rate limiting and retry logic"""
+        for attempt in range(self.max_retries):
+            try:
+                # Implement rate limiting
+                current_time = time.time()
+                time_since_last_call = current_time - self.last_api_call_time
+                
+                if time_since_last_call < self.api_delay:
+                    sleep_time = self.api_delay - time_since_last_call
+                    logger.info(f"Rate limiting: sleeping {sleep_time:.2f}s before API call")
+                    time.sleep(sleep_time)
+                
+                # Update last call time
+                self.last_api_call_time = time.time()
+                
+                # Make API call
+                logger.info(f"Making LLM API call (attempt {attempt + 1}/{self.max_retries})")
+                response = self.llm.invoke([HumanMessage(content=prompt)])
+                
+                return response.content
+                
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "rate limit" in error_msg or "429" in error_msg:
+                    wait_time = (attempt + 1) * 5  # Exponential backoff: 5s, 10s, 15s
+                    logger.warning(f"Rate limit hit, retrying in {wait_time}s (attempt {attempt + 1}/{self.max_retries})")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"LLM API call failed (attempt {attempt + 1}): {e}")
+                    if attempt == self.max_retries - 1:
+                        raise
+                    time.sleep(2)  # Brief pause before retry
+        
+        raise Exception(f"All {self.max_retries} API call attempts failed")
     
     def _load_cache(self) -> None:
         """Load score cache from disk"""
@@ -229,11 +276,11 @@ class Step6LLMReranker:
                          candidates: List[Dict[str, Any]],
                          target_count: int = 30) -> Dict[str, Any]:
         """
-        Main reranking function: 150 candidates → 30 final recommendations
+        Main reranking function: 80 candidates → 30 final recommendations
         
         Args:
             rag_brief: Step 5 generated RAG brief
-            candidates: 150 Stage A candidate artworks
+            candidates: 80 Stage A candidate artworks
             target_count: Number of final recommendations (default 30)
             
         Returns:
@@ -387,12 +434,12 @@ class Step6LLMReranker:
             # Generate scoring prompt
             prompt = Step6Prompts.get_batch_scoring_prompt(rag_brief, candidate_batch)
             
-            # Call LLM
+            # Call LLM with rate limiting
             logger.info(f"Scoring batch of {len(candidate_batch)} artworks with LLM...")
-            response = self.llm.invoke([HumanMessage(content=prompt)])
+            response_content = self._call_llm_with_rate_limit(prompt)
             
             # Parse response
-            scores = self._parse_llm_scores(response.content, candidate_batch, brief_hash)
+            scores = self._parse_llm_scores(response_content, candidate_batch, brief_hash)
             
             logger.info(f"Successfully scored {len(scores)} artworks")
             return scores
@@ -680,11 +727,11 @@ class Step6LLMReranker:
                 rec_dict = rec.to_dict()
                 prompt = Step6Prompts.get_justification_prompt(rec_dict, rag_brief)
                 
-                # Call LLM
-                response = self.llm.invoke([HumanMessage(content=prompt)])
+                # Call LLM with rate limiting
+                response_content = self._call_llm_with_rate_limit(prompt)
                 
                 # Clean and assign justification
-                justification = response.content.strip()
+                justification = response_content.strip()
                 
                 # Remove any markdown formatting or extra quotes
                 if justification.startswith('"') and justification.endswith('"'):

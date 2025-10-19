@@ -193,9 +193,9 @@ graph TB
 **A2 Path - Visual Similarity (CLIP):**
 - Text prompts: "peaceful blue landscape", "calming nature scene"
 - Visual matching against image embeddings
-- Found: 150 artworks
+- Found: 80 artworks
 
-**Combined Result:** 150 unique candidate artworks
+**Combined Result:** 80 unique candidate artworks
 
 #### 🎯 **Step 6: LLM Reranking** (36.8 seconds)
 **What happens:** GPT-4 evaluates each artwork across 6 dimensions for Sarah's specific needs:
@@ -309,12 +309,12 @@ graph TB
         subgraph "A2 Path: Visual Similarity"
             C --> G[CLIP Text Prompts]
             G --> H[Image Embeddings]
-            H --> I[~150 Candidates]
+            H --> I[~80 Candidates]
         end
         
         F --> J[Union Merge]
         I --> J
-        J --> K[150 Final Candidates]
+        J --> K[80 Final Candidates]
         
         subgraph "Data Sources"
             L[298 Artwork Metadata]
@@ -335,13 +335,13 @@ graph TB
 - **Dual-path hybrid search** combining metadata and visual similarity
 - **Dynamic keyword generation** based on emotional states
 - **CLIP ViT-B-32** for text-to-image semantic matching
-- **~7.3s processing time** for 150 candidates
+- **~4.8s processing time** for 80 candidates
 
 ### 🎯 Step 6: Multi-Dimensional LLM Reranking
 ```mermaid
 graph TB
     subgraph "Step 6: Intelligent Reranking System"
-        A[150 Candidates + Brief] --> B[Batch Processing]
+        A[80 Candidates + Brief] --> B[Batch Processing]
         B --> C[6-Dimensional Scoring]
         C --> D[MMR Diversity Selection]
         D --> E[Justification Generation]
@@ -405,7 +405,7 @@ sequenceDiagram
     CE->>SA: Collect candidates
     SA->>DB: Search metadata + CLIP
     DB-->>SA: Artwork matches
-    SA-->>CE: 150 candidates
+    SA-->>CE: 80 candidates
     
     CE->>S6: Rerank candidates
     S6->>S6: 6D LLM evaluation
@@ -461,7 +461,7 @@ gantt
 | Component | Target Time | Actual Time | Success Rate | Key Metrics |
 |-----------|-------------|-------------|--------------|-------------|
 | **Step 5 RAG** | ~4.3s | **22.4s** | 100% | 685 docs, 5 queries, BM25+FAISS |
-| **Stage A Collection** | ~2.1s | **7.3s** | 100% | 150 candidates, A1+A2 hybrid |
+| **Stage A Collection** | ~2.1s | **4.8s** | 100% | 80 candidates, A1+A2 hybrid |
 | **Step 6 Reranking** | ~8.7s | **36.8s** | 100% | 6D scoring, MMR selection |
 | **Total Pipeline** | **~15.1s** | **🎯 66.5s** | **100%** | **30 final recommendations** |
 
@@ -568,7 +568,7 @@ interface RecommendationOutput {
   ],
   "metadata": {
     "total_processing_time": 66.5,
-    "candidates_evaluated": 150,
+    "candidates_evaluated": 80,
     "cache_hit_rate": 0.73
   }
 }

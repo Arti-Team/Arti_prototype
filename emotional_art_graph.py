@@ -117,29 +117,53 @@ class ConversationPhaseManager:
         from langchain_core.messages import HumanMessage
         human_messages = [msg for msg in state.get("messages", []) if isinstance(msg, HumanMessage)]
         
+        current_phase = state.get("current_phase", "")
+        consent_for_reco = state.get("consent_for_reco")
+        final_situation = state.get("final_situation")
+        final_emotions = state.get("final_emotions")
+        conversation_depth = state.get("conversation_depth", 0)
+        
+        print(f"DEBUG detect_phase: current_phase={current_phase}, consent_for_reco={consent_for_reco}, final_situation={bool(final_situation)}, final_emotions={bool(final_emotions)}, conversation_depth={conversation_depth}, human_messages={len(human_messages)}")
+        
         if len(human_messages) <= 1:
+            print("DEBUG detect_phase: Returning 'greeting'")
             return "greeting"
         elif state.get("conversation_depth", 0) < 3:  # Continue conversation for at least 3 turns
+            print("DEBUG detect_phase: Returning 'deep_sensing' (depth < 3)")
             return "deep_sensing"
         elif not state.get("final_situation"):
             # After 3+ turns, check curation readiness
             readiness = await self.assess_curation_readiness(state)
             if readiness["ready"] and readiness["confidence"] >= 0.7:
+                print("DEBUG detect_phase: Returning 'final_analysis' (ready for curation)")
                 return "final_analysis"
             else:
+                print("DEBUG detect_phase: Returning 'deep_sensing' (not ready for curation)")
                 return "deep_sensing"  # Still need more conversation
+        elif state.get("current_phase") == "post_curation":
+            # After showing art recommendations, continue natural conversation - MUST check this first!
+            print("DEBUG detect_phase: Returning 'continuing' (post_curation)")
+            return "continuing"
+        elif state.get("current_phase") == "continuing":
+            # After any kind of curation attempt (success or failure), continue natural conversation
+            print("DEBUG detect_phase: Returning 'continuing' (current_phase=continuing)")
+            return "continuing"
+        elif state.get("consent_for_reco") == True:
+            print("DEBUG detect_phase: Returning 'providing_curation'")
+            return "providing_curation"
         elif (
             state.get("final_situation")
             and state.get("final_emotions")
             and not state.get("consent_for_reco")
         ):
+            print("DEBUG detect_phase: Returning 'offering'")
             return "offering"
-        elif state.get("consent_for_reco") == True:
-            return "providing_curation"
         elif state.get("consent_for_reco") == False:
             # Continue conversation when user declines curation
+            print("DEBUG detect_phase: Returning 'continuing_after_rejection'")
             return "continuing_after_rejection"
         else:
+            print("DEBUG detect_phase: Returning default 'continuing'")
             return "continuing"
 
     async def extract_emotion_hints(self, message_content: str) -> List[str]:
@@ -199,6 +223,9 @@ class ConversationPhaseManager:
         conversation_text = "\n".join(
             [f"{msg.type}: {msg.content}" for msg in recent_messages]
         )
+        
+        print(f"DEBUG generate_contextual_question: Called with conversation_text: {conversation_text}")
+        print(f"DEBUG generate_contextual_question: Current phase: {state.get('current_phase', '')}")
 
         emotion_hints = state.get("emotion_hints", [])
         situation_hints = state.get("situation_hints", [])
@@ -211,6 +238,10 @@ class ConversationPhaseManager:
             print(f"DEBUG: Using name '{user_name}' for contextual question")
 
         name_context = f"User's name: {user_name}" if user_name else "User's name: Not known yet"
+        
+        # Check if this is post-curation and user asked an art-related question
+        current_phase = state.get("current_phase", "")
+        is_post_curation = current_phase == "post_curation"
         
         question_prompt = f"""
         You are a warm, friendly companion who genuinely cares about the user. Think of yourself as a close friend 
@@ -225,10 +256,16 @@ class ConversationPhaseManager:
         Emotion hints collected so far: {emotion_hints}
         Situation hints collected so far: {situation_hints}
         Conversation depth: {depth}
+        Post-curation context: {is_post_curation}
+        
+        SPECIAL INSTRUCTION: If the user just asked about art-related topics (like drawing, painting techniques, art tips, 
+        art history, etc.) especially after receiving art recommendations, respond directly to their art question with 
+        helpful, knowledgeable advice. Be an enthusiastic art companion who can share practical tips and encouragement.
         
         Generate a response that feels like talking to a close friend who really gets you.
         
         Guidelines:
+        - If user asked an art-related question, answer it directly and enthusiastically with practical advice
         - Start with genuine empathy and understanding (like a friend would)
         - Use casual, warm language - avoid formal or clinical tone  
         - IMPORTANT: If the user's name is provided above, use EXACTLY that name (never make up or use different names)
@@ -240,7 +277,7 @@ class ConversationPhaseManager:
         - Be conversational and relatable, not formal or repetitive
         
         Structure your response as:
-        1. Friend-like empathetic validation (warm, casual tone - vary the language each time)
+        1. Direct answer to their question (if art-related) OR friend-like empathetic validation
         2. Natural follow-up question (conversational, not clinical)
         
         IMPORTANT: Don't use the same opening phrases repeatedly. Mix it up naturally:
@@ -387,6 +424,57 @@ class ConversationPhaseManager:
                 "reason": "Analysis failed"
             }
 
+    async def check_art_question(self, message_content: str) -> dict:
+        """Check if user message is asking an art-related question (vs simple consent)"""
+        if isinstance(message_content, list):
+            message_content = " ".join([item.get("text", "") if isinstance(item, dict) else str(item) for item in message_content])
+        
+        art_check_prompt = f"""
+        Analyze this message to determine if it's an art-related question or request:
+        
+        Message: "{message_content}"
+        
+        Determine if this is:
+        1. A simple consent response (like "yes", "no", "sure", "okay") 
+        2. An art-related question or request (asking about drawing, painting, art techniques, art history, creative advice, etc.)
+        
+        Return in this format:
+        IS_ART_QUESTION: [true/false]
+        CONFIDENCE: [0.0-1.0]
+        REASON: [brief explanation]
+        """
+        
+        try:
+            response = await self.llm.ainvoke([SystemMessage(content=art_check_prompt)])
+            content = response.content.strip()
+            
+            is_art_question = False
+            confidence = 0.0
+            reason = "Analysis failed"
+            
+            lines = content.split('\n')
+            for line in lines:
+                if line.startswith('IS_ART_QUESTION:'):
+                    is_art_question = line.replace('IS_ART_QUESTION:', '').strip().lower() == "true"
+                elif line.startswith('CONFIDENCE:'):
+                    confidence = float(line.replace('CONFIDENCE:', '').strip())
+                elif line.startswith('REASON:'):
+                    reason = line.replace('REASON:', '').strip()
+            
+            return {
+                "is_art_question": is_art_question,
+                "confidence": confidence,
+                "reason": reason
+            }
+            
+        except Exception as e:
+            print(f"Art question check error: {e}")
+            return {
+                "is_art_question": False,
+                "confidence": 0.0,
+                "reason": "Analysis failed"
+            }
+
     async def perform_final_analysis(self, state: EmotionalArtState) -> dict:
         """Analyze all collected hints and make final emotion/situation determination"""
         all_emotion_hints = state.get("emotion_hints", [])
@@ -463,10 +551,15 @@ async def load_user_memories(config: RunnableConfig, store: BaseStore) -> dict:
     # In LangGraph Studio, user_id may not be automatically set
     user_id = config.get("configurable", {}).get("user_id") or config.get("configurable", {}).get("thread_id", "default_user")
 
-    # Load profile memory
+    # Load profile memory using fixed key
     profile_namespace = ("profile", user_id)
-    profile_memories = await store.asearch(profile_namespace)
-    profile = profile_memories[0].value if profile_memories else None
+    try:
+        profile_mem = await store.aget(profile_namespace, "user_profile")
+        profile = profile_mem.value if profile_mem else None
+    except:
+        # Fallback to search if direct get fails
+        profile_memories = await store.asearch(profile_namespace)
+        profile = profile_memories[0].value if profile_memories else None
 
     # Load art preferences memory
     art_namespace = ("art_preferences", user_id)
@@ -666,49 +759,49 @@ class ThreadSafeMemoryProcessor:
             print(f"DEBUG: Sync memory update failed: {e}")
             return None
     
-    def _update_profile_sync(self, messages: list, existing_memories: list, 
+    def _update_profile_sync(self, messages: list, existing_memories: list,
                            emotion_hints: list, situation_hints: list):
         """Synchronous profile update"""
         from langchain_core.messages import SystemMessage
-        
+
         # Create instruction with context
         context_info = ""
         if emotion_hints:
             context_info += f"\nCurrent emotion patterns: {', '.join(emotion_hints[-5:])}"
         if situation_hints:
             context_info += f"\nCurrent situation context: {', '.join(situation_hints[-5:])}"
-            
+
         trustcall_instruction = f"""
         Update user profile based on this conversation.
-        Extract personal information: name, location, job, emotional context, life situation, 
+        Extract personal information: name, location, job, emotional context, life situation,
         relationships, interests/hobbies.{context_info}
         System Time: {datetime.now().isoformat()}
         """
-        
+
         messages_for_extraction = [SystemMessage(content=trustcall_instruction)] + messages
-        
+
         class SyncSpy:
             def __init__(self):
                 self.called_tools = []
             def __call__(self, run):
                 pass  # Simplified for thread execution
-        
+
         spy = SyncSpy()
         profile_extractor_with_spy = profile_extractor.with_listeners(on_end=spy)
-        
+
         result = profile_extractor_with_spy.invoke({
             "messages": messages_for_extraction,
-            "existing": None
+            "existing": existing_memories
         })
-        
-        # Prepare updates for async storage
+
+        # Use fixed key for single profile per user
         updates = []
-        for r, rmeta in zip(result["responses"], result["response_metadata"]):
+        for r in result["responses"]:
             updates.append({
-                'key': rmeta.get("json_doc_id", str(uuid.uuid4())),
+                'key': "user_profile",  # Fixed key - always update the same profile
                 'value': r.model_dump(mode="json")
             })
-        
+
         return {'updates': updates, 'type': 'profile'}
     
     def _update_art_preferences_sync(self, messages: list, existing_memories: list):
@@ -955,7 +1048,14 @@ async def conversation_node(state: EmotionalArtState, config: RunnableConfig, st
                 response_content = "What's been on your mind lately?"
         
         elif current_phase == "continuing":
-            response_content = generate_continuing_response(state, user_context)
+            # Use intelligent contextual response instead of generic post-curation response
+            print(f"DEBUG: In continuing phase, last_user_message: {last_user_message}")
+            if last_user_message:
+                print("DEBUG: Calling generate_contextual_question for post-curation response")
+                response_content = await phase_manager.generate_contextual_question(state, user_context)
+            else:
+                print("DEBUG: No last_user_message, using generic continuing response")
+                response_content = generate_continuing_response(state, user_context)
         
         else:
             response_content = "Hey, I'm here for you. What's going on?"
@@ -1135,15 +1235,16 @@ async def update_user_profile(state: EmotionalArtState, config: RunnableConfig, 
     spy = Spy()
     profile_extractor_with_spy = profile_extractor.with_listeners(on_end=spy)
     
-    # Don't pass existing memory, perform only completely new extraction
+    # Pass existing memory to update, not create new
     result = profile_extractor_with_spy.invoke({
         "messages": messages_for_extraction,
-        "existing": None  # Ignore existing memory and extract new
+        "existing": existing_memories
     })
-    
-    for r, rmeta in zip(result["responses"], result["response_metadata"]):
+
+    # Use fixed key for single profile per user
+    for r in result["responses"]:
         await store.aput(namespace,
-                         rmeta.get("json_doc_id", str(uuid.uuid4())),
+                         "user_profile",  # Fixed key - always update the same profile
                          r.model_dump(mode="json"))
 
     # Called from background, no response needed
@@ -1341,7 +1442,7 @@ async def handle_curation_request(state: EmotionalArtState, config: RunnableConf
     curation_input = prepare_curation_input(user_memories, state)
     
     # 2. Change to art_curation_engine working directory (critical for data loading)
-    original_cwd = os.getcwd()
+    original_cwd = await asyncio.to_thread(os.getcwd)
     # Use the art_curation_engine directory
     art_engine_dir = os.path.join(os.path.dirname(__file__), 'art_curation_engine')
     
@@ -1350,11 +1451,21 @@ async def handle_curation_request(state: EmotionalArtState, config: RunnableConf
         print(f"DEBUG: Changed working directory to {art_engine_dir}")
         
         # 3. Import and initialize (lazy loading for performance)
+        # Add project root to Python path for imports
+        import sys
+        project_root = os.path.dirname(art_engine_dir)
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
         from art_curation_engine.core import RAGSessionBrief, StageACollector, Step6LLMReranker
         
         rag_session = RAGSessionBrief()
         stage_a = StageACollector()
-        reranker = Step6LLMReranker(batch_size=5, max_workers=2)  # Smaller for conversation
+        reranker = Step6LLMReranker(
+            batch_size=2,  # Reduced batch size
+            max_workers=1,  # Single worker to prevent concurrent calls
+            api_delay_seconds=3.0,  # 3 second delay between API calls
+            max_retries=3  # Retry failed calls up to 3 times
+        )
         
     except ImportError as e:
         print(f"Art curation engine import error: {e}")
@@ -1457,8 +1568,15 @@ async def art_curation_node(state: EmotionalArtState, config: RunnableConfig, st
         print(f"DEBUG: Curation input prepared: {curation_input}")
         
         # 3. Set working directory to art_curation_engine
-        original_cwd = os.getcwd()
-        art_engine_path = os.path.join(original_cwd, "art_curation_engine")
+        original_cwd = await asyncio.to_thread(os.getcwd)
+        # Use absolute path - ensure we get the project root directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # If we're already in art_curation_engine, go up one level
+        if script_dir.endswith('art_curation_engine'):
+            project_root = os.path.dirname(script_dir)
+        else:
+            project_root = script_dir
+        art_engine_path = os.path.join(project_root, "art_curation_engine")
         
         if os.path.exists(art_engine_path):
             os.chdir(art_engine_path)
@@ -1472,11 +1590,20 @@ async def art_curation_node(state: EmotionalArtState, config: RunnableConfig, st
         
         # 4. Import and initialize (lazy loading for performance)
         try:
+            # Add project root to Python path for imports
+            import sys
+            if project_root not in sys.path:
+                sys.path.insert(0, project_root)
             from art_curation_engine.core import RAGSessionBrief, StageACollector, Step6LLMReranker
             
             rag_session = RAGSessionBrief()
             stage_a = StageACollector()
-            reranker = Step6LLMReranker(batch_size=5, max_workers=2)  # Smaller for conversation
+            reranker = Step6LLMReranker(
+            batch_size=2,  # Reduced batch size
+            max_workers=1,  # Single worker to prevent concurrent calls
+            api_delay_seconds=3.0,  # 3 second delay between API calls
+            max_retries=3  # Retry failed calls up to 3 times
+        )
             
         except ImportError as e:
             print(f"Art curation engine import error: {e}")
@@ -1535,7 +1662,8 @@ async def art_curation_node(state: EmotionalArtState, config: RunnableConfig, st
             return {
                 "messages": [AIMessage(content=response_text)],
                 "last_curation_result": final_recs,
-                "current_phase": "continuing",
+                "current_phase": "post_curation",
+                "consent_for_reco": False,  # Reset consent to prevent infinite loop
                 "curation_metadata": {
                     "processing_time": processing_time,
                     "confidence_level": curation_input["confidence_level"],
@@ -1549,7 +1677,8 @@ async def art_curation_node(state: EmotionalArtState, config: RunnableConfig, st
                           "Let's continue our conversation while I process that in the background.")
             return {
                 "messages": [AIMessage(content=timeout_msg)],
-                "current_phase": "continuing"
+                "current_phase": "continuing",
+                "consent_for_reco": False  # Reset consent to prevent infinite loop
             }
             
         except Exception as e:
@@ -1560,7 +1689,8 @@ async def art_curation_node(state: EmotionalArtState, config: RunnableConfig, st
                         "Would you like to continue our conversation, and I can try the recommendations again later?")
             return {
                 "messages": [AIMessage(content=error_msg)],
-                "current_phase": "continuing"
+                "current_phase": "continuing",
+                "consent_for_reco": False  # Reset consent to prevent infinite loop
             }
         
         finally:
@@ -1574,7 +1704,8 @@ async def art_curation_node(state: EmotionalArtState, config: RunnableConfig, st
         traceback.print_exc()
         return {
             "messages": [AIMessage(content="I'm having trouble with the art recommendations right now. Let's keep chatting!")],
-            "current_phase": "continuing"
+            "current_phase": "continuing",
+            "consent_for_reco": False  # Reset consent to prevent infinite loop
         }
 
 # =============================================================================
@@ -1638,6 +1769,7 @@ builder.add_conditional_edges(
         END: END
     }
 )
+# After art curation, end the turn - user's next message will start a new turn
 builder.add_edge("art_curation_node", END)
 
 # Graph Compile - LangGraph API handles persistence automatically
